@@ -11,11 +11,16 @@ using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
 namespace AttributesExpanded.Utils
 {
-    internal class CharInterface
+    internal class CharInterface : IDisposable
     {
+        public CharInterface()
+        {
+            
+        }
         public static unsafe void OnCreatingCharacterBase(nint gameObjectAddress, Guid _1, nint _2, nint customizePtr, nint _3)
         {
 
@@ -35,10 +40,13 @@ namespace AttributesExpanded.Utils
 
 
 
-
+        
 
             Service.Log.Information($"===A cool log message from {(nint)gameObj}===");
             
         }
+        
+        public void Dispose(){}
     }
+    
 }

@@ -40,16 +40,20 @@ public unsafe class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("Attributes Expanded");
-
   
 
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
-        pluginInterface.Create<Service>();
-        Configuration = Service.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
+        Service.PluginInterface = pluginInterface;
+        Service.configuration = Service.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        Service.configuration.Initialize(pluginInterface);
+
+        _ = pluginInterface.Create<Service>();
+        Service.plugin = this;
+        Service.penumbraApi = new PenumbraIpc(pluginInterface);
+        _ = pluginInterface.Create<Utils.CharInterface>();
         // you might normally want to embed resources and load them from the manifest stream
-        var goatImagePath = Path.Combine(Service.PluginInterface.AssemblyLocation.Directory?.FullName!, "goat.png");
 
 
 
@@ -60,11 +64,8 @@ public unsafe class Plugin : IDalamudPlugin
         {
         });
 
-        IPenumbraApi penumbraApi = null!;
 
-        var models = penumbraApi.ResourceTree.GetPlayerResourcesOfType(Penumbra.Api.Enums.ResourceType.Mdl, false);
-        RedrawAll redrawAll = new(pluginInterface);
-        EventSubscriber<nint, Guid, nint, nint, nint> creatingCharacterBaseEvent = CreatingCharacterBase.Subscriber(pluginInterface, CharInterface.OnCreatingCharacterBase);
+        //var models = Service.penumbraApi.ResourceTree.GetPlayerResourcesOfType(Penumbra.Api.Enums.ResourceType.Mdl, false);
     // Add a simple message to the log with level set to information
     // Use /xllog to open the log window in-game
     // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
