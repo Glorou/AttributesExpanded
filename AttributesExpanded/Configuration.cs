@@ -20,10 +20,5 @@ public class Configuration : IPluginConfiguration
     {
         Service.PluginInterface.SavePluginConfig(this);
     }
-    [NonSerialized]
-    private IDalamudPluginInterface? pluginInterface;
-    public void Initialize(IDalamudPluginInterface pluginInterface)
-    {
-        this.pluginInterface = pluginInterface;
-    }
+
 }

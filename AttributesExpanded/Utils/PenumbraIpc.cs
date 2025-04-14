@@ -14,7 +14,7 @@ namespace AttributesExpanded.Utils
     {
         private readonly RedrawAll redrawAll = new(pluginInterface);
         private readonly EventSubscriber<nint, Guid, nint, nint, nint> creatingCharacterBaseEvent =
-            CreatingCharacterBase.Subscriber(pluginInterface, Utils.CharInterface.OnCreatingCharacterBase);
+        CreatingCharacterBase.Subscriber(pluginInterface, Utils.CharInterface.OnCreatingCharacterBase);
 
         public void Dispose()
         {

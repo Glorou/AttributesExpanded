@@ -47,7 +47,6 @@ public unsafe class Plugin : IDalamudPlugin
 
         Service.PluginInterface = pluginInterface;
         Service.configuration = Service.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-        Service.configuration.Initialize(pluginInterface);
 
         _ = pluginInterface.Create<Service>();
         Service.plugin = this;
