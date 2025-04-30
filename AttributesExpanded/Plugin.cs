@@ -1,27 +1,23 @@
-using Dalamud.Game.Command;
-using Dalamud.IoC;
-using Dalamud.Plugin;
-using System.IO;
-using Dalamud.Interface.Windowing;
-using Dalamud.Plugin.Services;
-using Dalamud.Memory;
-using Dalamud.Game.ClientState.Objects.SubKinds;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
-using static Lumina.Models.Models.Model;
-using System.Globalization;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Dalamud.Game.Command;
+using Dalamud.Hooking;
+using Dalamud.Interface.Windowing;
+using Dalamud.Memory;
+using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
+using Dalamud.Utility.Signatures;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using Lumina.Excel.Sheets;
-using FFXIVClientStructs.FFXIV.Client.System.Framework;
-using Dalamud.Game.Text.SeStringHandling.Payloads;
-using Penumbra.Api;
-using Penumbra.Api.Api;
-using AttributesExpanded.Utils;
-using Penumbra.Api.Helpers;
-using Penumbra.Api.IpcSubscribers;
-using Penumbra.Api.IpcSubscribers.Legacy;
-using RedrawAll = Penumbra.Api.IpcSubscribers.RedrawAll;
-using CreatingCharacterBase = Penumbra.Api.IpcSubscribers.CreatingCharacterBase;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using FFXIVClientStructs.FFXIV.Client.System.Resource.Handle;
+using FFXIVClientStructs.FFXIV.Client.UI.Misc;
+using FFXIVClientStructs.Interop;
+using FFXIVClientStructs.STD;
+using InteropGenerator.Runtime;
+using ObjectKind = Dalamud.Game.ClientState.Objects.Enums.ObjectKind;
 
 namespace AttributesExpanded;
 
@@ -40,7 +36,7 @@ public unsafe class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("Attributes Expanded");
-  
+    private uint nextUpdateIndex = 0;
 
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
@@ -50,11 +46,12 @@ public unsafe class Plugin : IDalamudPlugin
 
         _ = pluginInterface.Create<Service>();
         Service.plugin = this;
-        Service.penumbraApi = new PenumbraIpc(pluginInterface);
-        _ = pluginInterface.Create<Utils.CharInterface>();
+
+        //_ = pluginInterface.Create<Utils.CharInterface>();
+        //_ = pluginInterface.Create<Utils.TextureInterface>();
         // you might normally want to embed resources and load them from the manifest stream
 
-
+    
 
 
 
@@ -64,15 +61,14 @@ public unsafe class Plugin : IDalamudPlugin
         });
 
 
-        //var models = Service.penumbraApi.ResourceTree.GetPlayerResourcesOfType(Penumbra.Api.Enums.ResourceType.Mdl, false);
-    // Add a simple message to the log with level set to information
-    // Use /xllog to open the log window in-game
-    // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
 
 
 
-    Service.Log.Information($"===A cool log message from {Service.PluginInterface.Manifest.Name}===");
+
+        Service.Log.Information($"===A cool log message from {Service.PluginInterface.Manifest.Name}===");
+
         
+        var hook = new MySiggedHook();
 
         //var modelMetas = new List<ModelMeta>();
         //foreach(var modelPtr in human->CharacterBase.ModelsSpan)
@@ -93,48 +89,176 @@ public unsafe class Plugin : IDalamudPlugin
         //        AttributesMask = model->EnabledAttributeIndexMask,
         //    });
         //}
+
+
     }
+    public unsafe class MySiggedHook : IDisposable {
+        // This method isn't in CS (in theory), so we need to declare our own delegate.
+        private delegate void SetupTopModelAttributes(Human* self, byte* data);
+        private delegate void SetupLegModelAttributes(Human* self, byte* data);
 
- /*   public unsafe Human* GetLocalPlayer()
-    {
-        var localPlayer = PluginService.ClientState.LocalPlayer;
-        if (localPlayer == null) { return null; }   
-        var localPlayerAddress = localPlayer.Address;
-        var localGO = (GameObject*)localPlayerAddress;
-        var localCB = (CharacterBase*)localGO->DrawObject;
-        var localHuman = (Human*)localCB;
-        return localHuman;
-    }
-    private static float? CheckModelSlot(Human* human, ModelSlot slot)
-    {
-        var modelArray = human->CharacterBase.Models;
-        if (modelArray == null) return null;
-        var feetModel = modelArray[(byte)slot];
-        if (feetModel == null) return null;
-        var modelResource = feetModel->ModelResourceHandle;
-        if (modelResource == null) return null;
+        [Signature("E8 ?? ?? ?? ?? 48 8B 87 ?? ?? ?? ?? 44 0F B6 7C 24", DetourName = nameof(DetourTopModelAttributes))]
+        private Hook<SetupTopModelAttributes>? _topUpdateHook;
 
-        foreach (var attr in modelResource->Attributes)
-        {
-            var str = MemoryHelper.ReadStringNullTerminated(new nint(attr.Item1.Value));
-            if (str.StartsWith("heels_offset=", StringComparison.OrdinalIgnoreCase))
-            {
-                if (float.TryParse(str[13..].Replace(',', '.'), CultureInfo.InvariantCulture, out var offsetAttr)) return offsetAttr * human->CharacterBase.DrawObject.Object.Scale.Y;
-            }
-            else if (str.StartsWith("heels_offset_", StringComparison.OrdinalIgnoreCase))
-            {
-                var valueStr = str[13..].Replace("n_", "-").Replace('a', '0').Replace('b', '1').Replace('c', '2').Replace('d', '3').Replace('e', '4').Replace('f', '5').Replace('g', '6').Replace('h', '7').Replace('i', '8').Replace('j', '9').Replace('_', '.');
+        [Signature(
+            "E8 ?? ?? ?? ?? 48 8D 54 24 ?? 48 8B CF E8 ?? ?? ?? ?? 48 8D 54 24 ?? 48 8B CF E8 ?? ?? ?? ?? 48 8B 87",
+            DetourName = nameof(DetourLegModelAttributes))]
+        private Hook<SetupLegModelAttributes>? _legUpdateHook;
 
-                if (float.TryParse(valueStr, CultureInfo.InvariantCulture, out var value)) return value * human->CharacterBase.DrawObject.Object.Scale.Y;
-            }
+        private StdMap<CStringPointer, short> tempTopShapes = new StdMap<CStringPointer, short>();
+        private StdMap<CStringPointer, short> tempBottomShapes = new StdMap<CStringPointer, short>();
+        private bool shapeFound = false;
+        
+        public MySiggedHook() {
+            Service.GameInteropProvider.InitializeFromAttributes(this);
+
+            // Nullable because this might not have been initialized from IFA above, e.g. the sig was invalid.
+            _topUpdateHook?.Enable();
+            _legUpdateHook?.Enable();
         }
 
-        return null;
+        public void Dispose()
+        {
+            _topUpdateHook?.Dispose();
+            _legUpdateHook?.Dispose();
+        }
+
+        private void DetourTopModelAttributes(Human* self, byte* data) {
+            Service.Log.Information("Top Detour ");
+            _topUpdateHook!.Original(self, data);
+            try
+            {
+
+                if (self->ModelsSpan[1] != null)
+                {
+                                    //yes I could combine this dont @ me
+                    if (self->ModelsSpan[4] != null)
+                    {
+
+                
+                        foreach(var shape in self->ModelsSpan[1].Value->ModelResourceHandle->Shapes) 
+                        {
+                            if(shape.Item1.AsSpan().StartsWith("shpx_"u8))
+                            {
+                                tempTopShapes.Add(shape);
+                            }
+                        }
+                        foreach(var shape in self->ModelsSpan[4].Value->ModelResourceHandle->Shapes) 
+                        {
+                            if(shape.Item1.Equals(tempTopShapes.Keys.First()))
+                            {
+                                tempBottomShapes.Add(shape);
+                                shapeFound = true;
+                            }
+                        }
+
+                        if (shapeFound)
+                        {
+                            self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask =
+                                (uint)self->ModelsSpan[1].Value->ModelResourceHandle->Shapes[tempTopShapes.First().Key];
+                        }
+
+                    }
+
+
+                }
+            } catch (Exception ex) {
+                Service.Log.Error(ex, "An error occured when handling a macro save event.");
+            }
+
+
+        }
+        
+        private void DetourLegModelAttributes(Human* self, byte* data) {
+            Service.Log.Information("Leg Detour");
+            _legUpdateHook!.Original(self, data);
+            try {
+                if (shapeFound)
+                {
+                    self->ModelsSpan[4].Value->EnabledShapeKeyIndexMask =
+                        (uint)self->ModelsSpan[4].Value->ModelResourceHandle->Shapes[tempBottomShapes.First().Key];
+                    
+                }
+                tempBottomShapes.Clear();
+                tempTopShapes.Clear();
+            } catch (Exception ex) {
+                Service.Log.Error(ex, "An error occured when handling a macro save event.");
+            }
+
+
+        }
+    }
+
+
+/*
+    public async Task UpdateObjectbyIndex(uint index)
+    {
+        foreach (var item in Service.ObjectTable) //Game objects
+        {
+            if (item.IsValid() && (item.ObjectKind == ObjectKind.Player || item.ObjectKind == ObjectKind.BattleNpc || item.ObjectKind == ObjectKind.EventNpc || item.ObjectKind == ObjectKind.Retainer)) {
+
+                var atrDict = new Dictionary<uint, String>();
+                var shpDict = new Dictionary<uint, ValueTuple<short, String>>();
+                var gameObj = (GameObject*)item.Address;
+                var draw = (Human*)gameObj->DrawObject;
+                if (draw->ModelsSpan == null) return;
+                var models = draw->ModelsSpan;
+                
+                foreach (var model in models)  //collect attributes and keys to check for matches
+                
+                {
+                    
+                    if (model == null) continue;
+                    //if (model.Value->ModelResourceHandle->Shapes[model.Value->EnabledShapeKeyIndexMask]) continue;
+                    if(model.Value->ModelResourceHandle->Attributes.Count != 0)
+                    { 
+                        foreach (var atr in model.Value->ModelResourceHandle->Attributes)
+                        { 
+                            if (atr.Item1.ToString().Contains("atrx_"))
+                            {
+                                atrDict.Add(model.Value->RefCount, atr.Item1.Value->ToString().Split('_')[1]);
+                            }
+                        }
+                    } 
+                    if (model.Value->ModelResourceHandle->Shapes.Count != 0) {
+                            foreach (var shp in model.Value->ModelResourceHandle->Shapes)
+                            {
+                                if (shp.Item1.ToString().Contains("shpx_"))  //!Utils.Constants.VanillaShp.Any
+                                {
+                                    shpDict.Add(model.Value->RefCount,(shp.Item2, shp.Item1.Value->ToString().Split('_')[1]));
+                                }
+                            }
+                    }
+                }
+
+            
+                
+                 * todo: compare non-vanilla shapes to non-vanilla attributes 
+                 * Gotta figure out what the most memory efficient way of storing the data is, tempted to reference original memory locations but... eh?
+                 * I should make this loop through clothing and accessories only, other models arent that useful, yet.... 
+                 * how am I gonna compare these strings?? I need to think of a way short of stripping atr off the front, I'm tempted to enforce atrx_ and shpx_ but then I could have avoided literally everything I just did lol
+                 
+                foreach(var shp in shpDict)
+                {
+                    foreach (var atr in atrDict)
+                    {
+                        if (shp.Key != atr.Key && atr.Value.Contains(shp.Value.Item2))
+                        {
+                            models[(int)shp.Key].Value->EnabledShapeKeyIndexMask = (uint)shp.Value.Item1;
+                        }
+                    }
+
+                }
+
+            }
+        }
+        /
+
+        return;
     } */
     public void Dispose()
     {
         WindowSystem.RemoveAllWindows();
-
         Service.Commands.RemoveHandler(CommandName);
     }
 
