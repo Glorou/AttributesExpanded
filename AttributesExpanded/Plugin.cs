@@ -37,6 +37,7 @@ public unsafe class Plugin : IDalamudPlugin
 
     public readonly WindowSystem WindowSystem = new("Attributes Expanded");
     private uint nextUpdateIndex = 0;
+    public MySiggedHook _mySiggedHook;
 
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
@@ -50,55 +51,42 @@ public unsafe class Plugin : IDalamudPlugin
         //_ = pluginInterface.Create<Utils.CharInterface>();
         //_ = pluginInterface.Create<Utils.TextureInterface>();
         // you might normally want to embed resources and load them from the manifest stream
-
-    
-
-
-
-
-        Service.Commands.AddHandler(CommandName, new CommandInfo(OnCommand)
-        {
-        });
-
-
-
-
-
+        
 
         Service.Log.Information($"===A cool log message from {Service.PluginInterface.Manifest.Name}===");
 
         
-        var hook = new MySiggedHook();
-
-        //var modelMetas = new List<ModelMeta>();
-        //foreach(var modelPtr in human->CharacterBase.ModelsSpan)
-        //{
-        //    var model = modelPtr.Value;
-        //    if (model == null)
-        //        continue;
-        //    if (model->ModelResourceHandle == null)
-        //        continue;
-        //    var shapes = model->ModelResourceHandle->Shapes.ToDictionary(kv => MemoryHelper.ReadStringNullTerminated((nint)kv.Item1.Value), kv => kv.Item2);
-        //    var attributes = model->ModelResourceHandle->Attributes.ToDictionary(kv => MemoryHelper.ReadStringNullTerminated((nint)kv.Item1.Value), kv => kv.Item2);
-        //    modelMetas.Add(new()
-        //    {
-        //        ModelPath = model->ModelResourceHandle->ResourceHandle.FileName.ToString(),
-        //        EnabledShapes = shapes.Where(kv => ((1 << kv.Value) & model->EnabledShapeKeyIndexMask) != 0).Select(kv => kv.Key).ToArray(),
-        //        EnabledAttributes = attributes.Where(kv => ((1 << kv.Value) & model->EnabledAttributeIndexMask) != 0).Select(kv => kv.Key).ToArray(),
-        //        ShapesMask = model->EnabledShapeKeyIndexMask,
-        //        AttributesMask = model->EnabledAttributeIndexMask,
-        //    });
-        //}
-
+        _mySiggedHook = new MySiggedHook();
 
     }
 
+    public void Dispose()
+    {
+        _mySiggedHook.Dispose();
+        WindowSystem.RemoveAllWindows();
+        Service.Commands.RemoveHandler(CommandName);
+    }
+    
+    
+    
+    /*
+     *Consider execution flow:
+     * Top happens first but only if one exists, I dont think its possible to *not* have a top? 
+     * for now do all processing of the model data and checking if I need to swap there
+     * We hook in to the rest of the functions and check if we need to activate them at all, make a dict<String, bool>
+     * so I can do if(enableDict["foot"]){actually mutate here} I should also probably calculate the bitmask outside the hook and store it too 
+     * oh or just do dict<String, short> and if .Value > 0 means it hit 
+     */
     public unsafe class MySiggedHook : IDisposable
     {
         // This method isn't in CS (in theory), so we need to declare our own delegate.
         private delegate void SetupTopModelAttributes(Human* self, byte* data);
 
         private delegate void SetupLegModelAttributes(Human* self, byte* data);
+        
+        private delegate void SetupFootModelAttributes(Human* self, byte* data);
+        
+        private delegate void SetupHandModelAttributes(Human* self, byte* data);
 
         [Signature("E8 ?? ?? ?? ?? 48 8B 87 ?? ?? ?? ?? 44 0F B6 7C 24", DetourName = nameof(DetourTopModelAttributes))]
         private Hook<SetupTopModelAttributes>? _topUpdateHook;
@@ -107,9 +95,25 @@ public unsafe class Plugin : IDalamudPlugin
             "E8 ?? ?? ?? ?? 48 8D 54 24 ?? 48 8B CF E8 ?? ?? ?? ?? 48 8D 54 24 ?? 48 8B CF E8 ?? ?? ?? ?? 48 8B 87",
             DetourName = nameof(DetourLegModelAttributes))]
         private Hook<SetupLegModelAttributes>? _legUpdateHook;
+        
+        [Signature("40 53 57 41 56 48 83 EC 20 48 8B 81 ?? ?? ?? ?? 48 8B FA", DetourName = nameof(DetourHandModelAttributes))]
+        private Hook<SetupHandModelAttributes>? _handUpdateHook;
+        
+        [Signature("40 53 56 41 56 48 83 EC ?? 48 8B 99 ?? ?? ?? ?? 48 8B F2", DetourName = nameof(DetourFootModelAttributes))]
+        private Hook<SetupFootModelAttributes>? _footUpdateHook;
 
         private Dictionary<String, short> tempTopShapes = new Dictionary<String, short>();
         private Dictionary<String, short> tempBottomShapes = new Dictionary<String, short>();
+        private Dictionary<String, short> tempHandShapes = new Dictionary<String, short>();
+        private Dictionary<String, short> tempFootShapes = new Dictionary<String, short>();
+
+        private Dictionary<short, uint> mask = new Dictionary<short, uint>
+        {
+            {1,0},
+            {2,0},
+            {3,0},
+            {4,0}
+        };
 
         public MySiggedHook()
         {
@@ -118,89 +122,218 @@ public unsafe class Plugin : IDalamudPlugin
             // Nullable because this might not have been initialized from IFA above, e.g. the sig was invalid.
             _topUpdateHook?.Enable();
             _legUpdateHook?.Enable();
+            _handUpdateHook?.Enable();
+            _footUpdateHook?.Enable();
         }
 
         public void Dispose()
         {
             _topUpdateHook?.Dispose();
             _legUpdateHook?.Dispose();
+            _handUpdateHook?.Dispose();
+            _footUpdateHook?.Dispose();
         }
+
+
+        /// <summary> Function iterates through all checked objects and sets bitmask for matching instances </summary>
+        private void CalculateBitmask(Human* self)
+        {
+            //check if we already did this, 
+                
+                //this is kinda ass but i'll fix it later
+                //Body
+                try
+                {
+
+                    if (self->ModelsSpan[1] != null)
+                    {
+                    
+
+                        foreach (var shape in self->ModelsSpan[1].Value->ModelResourceHandle->Shapes)
+                        {
+                            if (shape.Item1.AsSpan().StartsWith("shp_wa_"u8) || shape.Item1.AsSpan().StartsWith("shp_wr_"u8))
+                            {
+                                tempTopShapes.Add(shape.Item1.ToString(), shape.Item2);
+                            }
+                        
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Service.Log.Error(ex, "An error occured when handling Body shapes.");
+                }
+                
+                //Hands
+                try
+                {
+                    if (self->ModelsSpan[2] != null)
+                    {
+
+                        foreach (var shape in self->ModelsSpan[2].Value->ModelResourceHandle->Shapes)
+                        {
+                            if (shape.Item1.AsSpan().StartsWith("shp_wr_"u8))
+                            {
+                                tempHandShapes.Add(shape.Item1.ToString(), shape.Item2);
+
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Service.Log.Error(ex, "An error occured when handling Hand shapes.");
+                }
+
+                //Legs
+                
+                try
+                {
+                    if (self->ModelsSpan[3] != null)
+                    {
+
+                        foreach (var shape in self->ModelsSpan[3].Value->ModelResourceHandle->Shapes)
+                        {
+                            if (shape.Item1.AsSpan().StartsWith("shp_wa_"u8) || shape.Item1.AsSpan().StartsWith("shp_an_"u8))
+                            {
+                                tempBottomShapes.Add(shape.Item1.ToString(), shape.Item2);
+
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Service.Log.Error(ex, "An error occured when handling Leg shapes.");
+                }
+
+
+                //Foot
+                try
+                {
+                    if (self->ModelsSpan[4] != null)
+                    {
+
+                        foreach (var shape in self->ModelsSpan[4].Value->ModelResourceHandle->Shapes)
+                        {
+                            if (shape.Item1.AsSpan().StartsWith("shp_an"u8))
+                            {
+                                tempFootShapes.Add(shape.Item1.ToString(), shape.Item2);
+
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Service.Log.Error(ex, "An error occured when handling Foot shapes.");
+                }
+
+                //Check waist
+                if (tempTopShapes.Count > 0 && tempBottomShapes.Count > 0)
+                {
+                    foreach (var shape in tempTopShapes.Keys)
+                    {
+                        if (tempBottomShapes.Keys.Contains(shape))
+                        {
+                            
+                            mask[1] |= (uint)(1 << tempTopShapes[shape]);
+                            mask[3] |= (uint)(1 << tempBottomShapes[shape]);
+                        }
+                    }
+                }
+                //Check wrist
+                if (tempTopShapes.Count > 0 && tempHandShapes.Count > 0)
+                {
+                    foreach (var shape in tempTopShapes.Keys)
+                    {
+                        if (tempHandShapes.Keys.Contains(shape))
+                        {
+                            
+                            mask[1] |= (uint)(1 << tempTopShapes[shape]);
+                            mask[2] |= (uint)(1 << tempHandShapes[shape]);
+                        }
+                    }
+                }
+                
+                //Check ankles 
+                if (tempBottomShapes.Count > 0 && tempFootShapes.Count > 0)
+                {
+                    foreach (var shape in tempBottomShapes.Keys)
+                    {
+                        if (tempFootShapes.Keys.Contains(shape))
+                        {
+                            
+                            mask[3] |= (uint)(1 << tempBottomShapes[shape]);
+                            mask[4] |= (uint)(1 << tempFootShapes[shape]);
+                        }
+                    }
+                }
+                tempTopShapes.Clear();
+                tempBottomShapes.Clear();
+                tempHandShapes.Clear();
+                tempFootShapes.Clear();
+                
+                return;
+            }
+
+        
 
         private void DetourTopModelAttributes(Human* self, byte* data)
         {
             Service.Log.Information("Top Detour ");
+            CalculateBitmask(self);
             _topUpdateHook!.Original(self, data);
-            try
+            if (mask[1] != 0 && self->ModelsSpan[1] != null)
             {
-
-                if (self->ModelsSpan[1] != null)
-                {
-                    
-
-                    foreach (var shape in self->ModelsSpan[1].Value->ModelResourceHandle->Shapes)
-                    {
-                        if (shape.Item1.AsSpan().StartsWith("shpx_"u8))
-                        {
-                            tempTopShapes.Add(shape.Item1.ToString(), shape.Item2);
-                            break;
-                        }
-                        
-                    }
-                }
+                self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask = mask[1];
             }
-            catch (Exception ex)
-            {
-                Service.Log.Error(ex, "An error occured when handling a macro save event.");
-            }
-
-
+            mask[1] = 0;
         }
 
         private void DetourLegModelAttributes(Human* self, byte* data)
         {
             Service.Log.Information("Leg Detour");
+            CalculateBitmask(self);
             _legUpdateHook!.Original(self, data);
-            try
+            if (mask[3] != 0 && self->ModelsSpan[3] != null)
             {
-                if (self->ModelsSpan[3] != null)
-                {
-
-                    foreach (var shape in self->ModelsSpan[3].Value->ModelResourceHandle->Shapes)
-                    {
-                        if (shape.Item1.AsSpan().StartsWith("shpx_"u8))
-                        {
-                            tempBottomShapes.Add(shape.Item1.ToString(), shape.Item2);
-
-                        }
-                    }
-                    
-                    
-                    //Will actually do some logical sorting through here but for now compare index 0 to index 0
-                    if (tempTopShapes.Count > 0 && tempBottomShapes.Count > 0)
-                    {
-                        foreach (var shape in tempTopShapes.Keys)
-                        {
-                            if (tempBottomShapes.Keys.Contains(shape))
-                            {
-                                self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask = (uint)
-                                    (1 << tempTopShapes[shape]);
-                                self->ModelsSpan[4].Value->EnabledShapeKeyIndexMask =
-                                    (uint) (1 << tempBottomShapes[shape]);
-                            }
-                        }
-                    }
-                    
-
-                    tempBottomShapes.Clear();
-                    tempTopShapes.Clear();
-                }
+                self->ModelsSpan[3].Value->EnabledShapeKeyIndexMask = mask[3];
+                
             }
-            catch (Exception ex)
-            {
-                Service.Log.Error(ex, "An error occured when handling a macro save event.");
-            }
+            mask[3] = 0;
         }
+        private void DetourHandModelAttributes(Human* self, byte* data)
+        {
+            Service.Log.Information("Hand Detour");
+            CalculateBitmask(self);
+            _legUpdateHook!.Original(self, data);
+            if (mask[2] != 0 && self->ModelsSpan[2] != null)
+            {
+                self->ModelsSpan[2].Value->EnabledShapeKeyIndexMask = mask[2];
+                
+            }
+            mask[2] = 0;
+        }
+        private void DetourFootModelAttributes(Human* self, byte* data)
+        {
+            Service.Log.Information("Foot Detour");
+            CalculateBitmask(self);
+            _legUpdateHook!.Original(self, data );
+            if (mask[4] != 0 && self->ModelsSpan[4] != null)
+            {
+                self->ModelsSpan[4].Value->EnabledShapeKeyIndexMask = mask[4];
+                
+            }
+            mask[4] = 0;
+        }
+        
+        
+        
+        
     }
+    
+}
 
 /*
     public async Task UpdateObjectbyIndex(uint index)
@@ -268,21 +401,7 @@ public unsafe class Plugin : IDalamudPlugin
 
         return;
     } */
-        public void Dispose()
-        {
-            WindowSystem.RemoveAllWindows();
-            Service.Commands.RemoveHandler(CommandName);
-        }
-
-        private void OnCommand(string command, string args)
-        {
-            // in response to the slash command, just toggle the display status of our main ui
-
-        }
 
 
+  
 
-
-
-   
-}
