@@ -130,8 +130,7 @@ public unsafe class Plugin : IDalamudPlugin
         {
             Service.Log.Information("Top Detour ");
             _topUpdateHook!.Original(self, data);
-            self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask = 1;
-  /*          try
+            try
             {
 
                 if (self->ModelsSpan[1] != null)
@@ -147,14 +146,12 @@ public unsafe class Plugin : IDalamudPlugin
                         }
                         
                     }
-                    self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask = 0;
                 }
-                
             }
             catch (Exception ex)
             {
                 Service.Log.Error(ex, "An error occured when handling a macro save event.");
-            }*/
+            }
 
 
         }
@@ -163,8 +160,7 @@ public unsafe class Plugin : IDalamudPlugin
         {
             Service.Log.Information("Leg Detour");
             _legUpdateHook!.Original(self, data);
-            self->ModelsSpan[3].Value->EnabledShapeKeyIndexMask = 1;
-           /* try
+            try
             {
                 if (self->ModelsSpan[3] != null)
                 {
@@ -186,10 +182,10 @@ public unsafe class Plugin : IDalamudPlugin
                         {
                             if (tempBottomShapes.Keys.Contains(shape))
                             {
-                                self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask =
-                                    (uint)tempTopShapes[shape];
+                                self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask = (uint)
+                                    (1 << tempTopShapes[shape]);
                                 self->ModelsSpan[4].Value->EnabledShapeKeyIndexMask =
-                                    (uint)tempBottomShapes[shape];
+                                    (uint) (1 << tempBottomShapes[shape]);
                             }
                         }
                     }
@@ -203,7 +199,7 @@ public unsafe class Plugin : IDalamudPlugin
             {
                 Service.Log.Error(ex, "An error occured when handling a macro save event.");
             }
-        }*/
+        }
     }
 
 /*
