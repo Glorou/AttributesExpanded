@@ -87,6 +87,8 @@ public unsafe class Plugin : IDalamudPlugin
         private delegate void SetupFootModelAttributes(Human* self, byte* data);
         
         private delegate void SetupHandModelAttributes(Human* self, byte* data);
+        
+        private delegate void SetupFromResourceHandle(Model* _model, ModelResourceHandle* _resourceHandle, nint _renderModelCallback, nint _renderMaterialCallback);
 
         [Signature("E8 ?? ?? ?? ?? 48 8B 87 ?? ?? ?? ?? 44 0F B6 7C 24", DetourName = nameof(DetourTopModelAttributes))]
         private Hook<SetupTopModelAttributes>? _topUpdateHook;
@@ -101,6 +103,9 @@ public unsafe class Plugin : IDalamudPlugin
         
         [Signature("40 53 56 41 56 48 83 EC ?? 48 8B 99 ?? ?? ?? ?? 48 8B F2", DetourName = nameof(DetourFootModelAttributes))]
         private Hook<SetupFootModelAttributes>? _footUpdateHook;
+        
+        [Signature("E8 ?? ?? ?? ?? 84 C0 75 ?? 48 8B 07 48 8B CF FF 50 ?? 32 C0", DetourName = nameof(DetourFromResourceHandle))]
+        private Hook<SetupFromResourceHandle>? _unknUpdateHook;
 
         private Dictionary<String, short> tempTopShapes = new Dictionary<String, short>();
         private Dictionary<String, short> tempBottomShapes = new Dictionary<String, short>();
@@ -328,7 +333,13 @@ public unsafe class Plugin : IDalamudPlugin
             mask[4] = 0;
         }
         
-        
+        private void DetourFromResourceHandle(Model* _model, ModelResourceHandle* _resourceHandle, nint _renderModelCallback, nint _renderMaterialCallback)
+        {
+            Service.Log.Information("Resource Handle Detour ");
+            _unknUpdateHook!.Original(_model, _resourceHandle, _renderModelCallback, _renderMaterialCallback);
+            var model = _model;
+
+        }
         
         
     }
