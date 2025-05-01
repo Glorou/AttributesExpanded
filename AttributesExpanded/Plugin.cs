@@ -92,9 +92,12 @@ public unsafe class Plugin : IDalamudPlugin
 
 
     }
-    public unsafe class MySiggedHook : IDisposable {
+
+    public unsafe class MySiggedHook : IDisposable
+    {
         // This method isn't in CS (in theory), so we need to declare our own delegate.
         private delegate void SetupTopModelAttributes(Human* self, byte* data);
+
         private delegate void SetupLegModelAttributes(Human* self, byte* data);
 
         [Signature("E8 ?? ?? ?? ?? 48 8B 87 ?? ?? ?? ?? 44 0F B6 7C 24", DetourName = nameof(DetourTopModelAttributes))]
@@ -105,11 +108,11 @@ public unsafe class Plugin : IDalamudPlugin
             DetourName = nameof(DetourLegModelAttributes))]
         private Hook<SetupLegModelAttributes>? _legUpdateHook;
 
-        private StdMap<CStringPointer, short> tempTopShapes = new StdMap<CStringPointer, short>();
-        private StdMap<CStringPointer, short> tempBottomShapes = new StdMap<CStringPointer, short>();
-        private bool shapeFound = false;
-        
-        public MySiggedHook() {
+        private Dictionary<String, short> tempTopShapes = new Dictionary<String, short>();
+        private Dictionary<String, short> tempBottomShapes = new Dictionary<String, short>();
+
+        public MySiggedHook()
+        {
             Service.GameInteropProvider.InitializeFromAttributes(this);
 
             // Nullable because this might not have been initialized from IFA above, e.g. the sig was invalid.
@@ -123,72 +126,85 @@ public unsafe class Plugin : IDalamudPlugin
             _legUpdateHook?.Dispose();
         }
 
-        private void DetourTopModelAttributes(Human* self, byte* data) {
+        private void DetourTopModelAttributes(Human* self, byte* data)
+        {
             Service.Log.Information("Top Detour ");
             _topUpdateHook!.Original(self, data);
-            try
+            self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask = 1;
+  /*          try
             {
 
                 if (self->ModelsSpan[1] != null)
                 {
-                                    //yes I could combine this dont @ me
-                    if (self->ModelsSpan[4] != null)
+                    
+
+                    foreach (var shape in self->ModelsSpan[1].Value->ModelResourceHandle->Shapes)
                     {
-
-                
-                        foreach(var shape in self->ModelsSpan[1].Value->ModelResourceHandle->Shapes) 
+                        if (shape.Item1.AsSpan().StartsWith("shpx_"u8))
                         {
-                            if(shape.Item1.AsSpan().StartsWith("shpx_"u8))
-                            {
-                                tempTopShapes.Add(shape);
-                            }
+                            tempTopShapes.Add(shape.Item1.ToString(), shape.Item2);
+                            break;
                         }
-                        foreach(var shape in self->ModelsSpan[4].Value->ModelResourceHandle->Shapes) 
-                        {
-                            if(shape.Item1.Equals(tempTopShapes.Keys.First()))
-                            {
-                                tempBottomShapes.Add(shape);
-                                shapeFound = true;
-                            }
-                        }
-
-                        if (shapeFound)
-                        {
-                            self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask =
-                                (uint)self->ModelsSpan[1].Value->ModelResourceHandle->Shapes[tempTopShapes.First().Key];
-                        }
-
+                        
                     }
-
-
+                    self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask = 0;
                 }
-            } catch (Exception ex) {
-                Service.Log.Error(ex, "An error occured when handling a macro save event.");
+                
             }
+            catch (Exception ex)
+            {
+                Service.Log.Error(ex, "An error occured when handling a macro save event.");
+            }*/
 
 
         }
-        
-        private void DetourLegModelAttributes(Human* self, byte* data) {
+
+        private void DetourLegModelAttributes(Human* self, byte* data)
+        {
             Service.Log.Information("Leg Detour");
             _legUpdateHook!.Original(self, data);
-            try {
-                if (shapeFound)
+            self->ModelsSpan[3].Value->EnabledShapeKeyIndexMask = 1;
+           /* try
+            {
+                if (self->ModelsSpan[3] != null)
                 {
-                    self->ModelsSpan[4].Value->EnabledShapeKeyIndexMask =
-                        (uint)self->ModelsSpan[4].Value->ModelResourceHandle->Shapes[tempBottomShapes.First().Key];
+
+                    foreach (var shape in self->ModelsSpan[3].Value->ModelResourceHandle->Shapes)
+                    {
+                        if (shape.Item1.AsSpan().StartsWith("shpx_"u8))
+                        {
+                            tempBottomShapes.Add(shape.Item1.ToString(), shape.Item2);
+
+                        }
+                    }
                     
+                    
+                    //Will actually do some logical sorting through here but for now compare index 0 to index 0
+                    if (tempTopShapes.Count > 0 && tempBottomShapes.Count > 0)
+                    {
+                        foreach (var shape in tempTopShapes.Keys)
+                        {
+                            if (tempBottomShapes.Keys.Contains(shape))
+                            {
+                                self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask =
+                                    (uint)tempTopShapes[shape];
+                                self->ModelsSpan[4].Value->EnabledShapeKeyIndexMask =
+                                    (uint)tempBottomShapes[shape];
+                            }
+                        }
+                    }
+                    
+
+                    tempBottomShapes.Clear();
+                    tempTopShapes.Clear();
                 }
-                tempBottomShapes.Clear();
-                tempTopShapes.Clear();
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 Service.Log.Error(ex, "An error occured when handling a macro save event.");
             }
-
-
-        }
+        }*/
     }
-
 
 /*
     public async Task UpdateObjectbyIndex(uint index)
@@ -203,23 +219,23 @@ public unsafe class Plugin : IDalamudPlugin
                 var draw = (Human*)gameObj->DrawObject;
                 if (draw->ModelsSpan == null) return;
                 var models = draw->ModelsSpan;
-                
+
                 foreach (var model in models)  //collect attributes and keys to check for matches
-                
+
                 {
-                    
+
                     if (model == null) continue;
                     //if (model.Value->ModelResourceHandle->Shapes[model.Value->EnabledShapeKeyIndexMask]) continue;
                     if(model.Value->ModelResourceHandle->Attributes.Count != 0)
-                    { 
+                    {
                         foreach (var atr in model.Value->ModelResourceHandle->Attributes)
-                        { 
+                        {
                             if (atr.Item1.ToString().Contains("atrx_"))
                             {
                                 atrDict.Add(model.Value->RefCount, atr.Item1.Value->ToString().Split('_')[1]);
                             }
                         }
-                    } 
+                    }
                     if (model.Value->ModelResourceHandle->Shapes.Count != 0) {
                             foreach (var shp in model.Value->ModelResourceHandle->Shapes)
                             {
@@ -231,13 +247,13 @@ public unsafe class Plugin : IDalamudPlugin
                     }
                 }
 
-            
-                
-                 * todo: compare non-vanilla shapes to non-vanilla attributes 
+
+
+                 * todo: compare non-vanilla shapes to non-vanilla attributes
                  * Gotta figure out what the most memory efficient way of storing the data is, tempted to reference original memory locations but... eh?
-                 * I should make this loop through clothing and accessories only, other models arent that useful, yet.... 
+                 * I should make this loop through clothing and accessories only, other models arent that useful, yet....
                  * how am I gonna compare these strings?? I need to think of a way short of stripping atr off the front, I'm tempted to enforce atrx_ and shpx_ but then I could have avoided literally everything I just did lol
-                 
+
                 foreach(var shp in shpDict)
                 {
                     foreach (var atr in atrDict)
@@ -256,17 +272,17 @@ public unsafe class Plugin : IDalamudPlugin
 
         return;
     } */
-    public void Dispose()
-    {
-        WindowSystem.RemoveAllWindows();
-        Service.Commands.RemoveHandler(CommandName);
-    }
+        public void Dispose()
+        {
+            WindowSystem.RemoveAllWindows();
+            Service.Commands.RemoveHandler(CommandName);
+        }
 
-    private void OnCommand(string command, string args)
-    {
-        // in response to the slash command, just toggle the display status of our main ui
+        private void OnCommand(string command, string args)
+        {
+            // in response to the slash command, just toggle the display status of our main ui
 
-    }
+        }
 
 
 
