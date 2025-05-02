@@ -9,6 +9,7 @@ using Dalamud.Memory;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility.Signatures;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -48,11 +49,6 @@ public unsafe class Plugin : IDalamudPlugin
         _ = pluginInterface.Create<Service>();
         Service.plugin = this;
 
-        //_ = pluginInterface.Create<Utils.CharInterface>();
-        //_ = pluginInterface.Create<Utils.TextureInterface>();
-        // you might normally want to embed resources and load them from the manifest stream
-        
-
         Service.Log.Information($"===A cool log message from {Service.PluginInterface.Manifest.Name}===");
 
         
@@ -79,7 +75,7 @@ public unsafe class Plugin : IDalamudPlugin
      */
     public unsafe class MySiggedHook : IDisposable
     {
-        // This method isn't in CS (in theory), so we need to declare our own delegate.
+
         private delegate void SetupTopModelAttributes(Human* self, byte* data);
 
         private delegate void SetupLegModelAttributes(Human* self, byte* data);
@@ -88,7 +84,10 @@ public unsafe class Plugin : IDalamudPlugin
         
         private delegate void SetupHandModelAttributes(Human* self, byte* data);
         
-        private delegate void SetupFromResourceHandle(Model* _model, ModelResourceHandle* _resourceHandle, nint _renderModelCallback, nint _renderMaterialCallback);
+        //Development hooks
+        private delegate nint SetupFromResourceHandle(Model* _model, ModelResourceHandle* _resourceHandle, nint _renderModelCallback, nint _renderMaterialCallback);
+
+        private delegate void InitCharacter(Human* self);
 
         [Signature("E8 ?? ?? ?? ?? 48 8B 87 ?? ?? ?? ?? 44 0F B6 7C 24", DetourName = nameof(DetourTopModelAttributes))]
         private Hook<SetupTopModelAttributes>? _topUpdateHook;
@@ -104,14 +103,21 @@ public unsafe class Plugin : IDalamudPlugin
         [Signature("40 53 56 41 56 48 83 EC ?? 48 8B 99 ?? ?? ?? ?? 48 8B F2", DetourName = nameof(DetourFootModelAttributes))]
         private Hook<SetupFootModelAttributes>? _footUpdateHook;
         
-        [Signature("E8 ?? ?? ?? ?? 84 C0 75 ?? 48 8B 07 48 8B CF FF 50 ?? 32 C0", DetourName = nameof(DetourFromResourceHandle))]
+        //Development hooks
+/*[Signature("E8 ?? ?? ?? ?? 84 C0 75 ?? 48 8B 07 48 8B CF FF 50 ?? 32 C0", DetourName = nameof(DetourFromResourceHandle))]
         private Hook<SetupFromResourceHandle>? _unknUpdateHook;
+        
+        [Signature("E8 ?? ?? ?? ?? C7 86 ?? ?? ?? ?? ?? ?? ?? ?? 48 83 C4", DetourName = nameof(DetourInitCharacter))]
+        private Hook<InitCharacter>? _initializerHook;*/
 
         private Dictionary<String, short> tempTopShapes = new Dictionary<String, short>();
         private Dictionary<String, short> tempBottomShapes = new Dictionary<String, short>();
         private Dictionary<String, short> tempHandShapes = new Dictionary<String, short>();
         private Dictionary<String, short> tempFootShapes = new Dictionary<String, short>();
 
+        private bool hasUpdated = false;
+        
+        
         private Dictionary<short, uint> mask = new Dictionary<short, uint>
         {
             {1,0},
@@ -119,6 +125,7 @@ public unsafe class Plugin : IDalamudPlugin
             {3,0},
             {4,0}
         };
+
 
         public MySiggedHook()
         {
@@ -129,6 +136,7 @@ public unsafe class Plugin : IDalamudPlugin
             _legUpdateHook?.Enable();
             _handUpdateHook?.Enable();
             _footUpdateHook?.Enable();
+            //_unknUpdateHook?.Enable();
         }
 
         public void Dispose()
@@ -137,13 +145,16 @@ public unsafe class Plugin : IDalamudPlugin
             _legUpdateHook?.Dispose();
             _handUpdateHook?.Dispose();
             _footUpdateHook?.Dispose();
+            //_unknUpdateHook?.Disable();
         }
+
 
 
         /// <summary> Function iterates through all checked objects and sets bitmask for matching instances </summary>
         private void CalculateBitmask(Human* self)
         {
             //check if we already did this, 
+
                 
                 //this is kinda ass but i'll fix it later
                 //Body
@@ -278,7 +289,6 @@ public unsafe class Plugin : IDalamudPlugin
                 tempBottomShapes.Clear();
                 tempHandShapes.Clear();
                 tempFootShapes.Clear();
-                
                 return;
             }
 
@@ -289,6 +299,12 @@ public unsafe class Plugin : IDalamudPlugin
             Service.Log.Information("Top Detour ");
             CalculateBitmask(self);
             _topUpdateHook!.Original(self, data);
+            if (!hasUpdated)
+            {
+                hasUpdated = true;
+                DetourLegModelAttributes(self, data);
+            }
+
             if (mask[1] != 0 && self->ModelsSpan[1] != null)
             {
                 self->ModelsSpan[1].Value->EnabledShapeKeyIndexMask = mask[1];
@@ -301,18 +317,25 @@ public unsafe class Plugin : IDalamudPlugin
             Service.Log.Information("Leg Detour");
             CalculateBitmask(self);
             _legUpdateHook!.Original(self, data);
+            if (!hasUpdated)
+            {
+                hasUpdated = true;
+                DetourTopModelAttributes(self, data);
+            }
+
             if (mask[3] != 0 && self->ModelsSpan[3] != null)
             {
                 self->ModelsSpan[3].Value->EnabledShapeKeyIndexMask = mask[3];
                 
             }
             mask[3] = 0;
+            hasUpdated = false;
         }
         private void DetourHandModelAttributes(Human* self, byte* data)
         {
             Service.Log.Information("Hand Detour");
             CalculateBitmask(self);
-            _legUpdateHook!.Original(self, data);
+            _handUpdateHook!.Original(self, data);
             if (mask[2] != 0 && self->ModelsSpan[2] != null)
             {
                 self->ModelsSpan[2].Value->EnabledShapeKeyIndexMask = mask[2];
@@ -324,7 +347,7 @@ public unsafe class Plugin : IDalamudPlugin
         {
             Service.Log.Information("Foot Detour");
             CalculateBitmask(self);
-            _legUpdateHook!.Original(self, data );
+            _footUpdateHook!.Original(self, data );
             if (mask[4] != 0 && self->ModelsSpan[4] != null)
             {
                 self->ModelsSpan[4].Value->EnabledShapeKeyIndexMask = mask[4];
@@ -333,86 +356,24 @@ public unsafe class Plugin : IDalamudPlugin
             mask[4] = 0;
         }
         
-        private void DetourFromResourceHandle(Model* _model, ModelResourceHandle* _resourceHandle, nint _renderModelCallback, nint _renderMaterialCallback)
+ /*       private nint DetourFromResourceHandle(Model* _model, ModelResourceHandle* _resourceHandle, nint _renderModelCallback, nint _renderMaterialCallback)
         {
             Service.Log.Information("Resource Handle Detour ");
-            _unknUpdateHook!.Original(_model, _resourceHandle, _renderModelCallback, _renderMaterialCallback);
+            var holder = _unknUpdateHook!.Original(_model, _resourceHandle, _renderModelCallback, _renderMaterialCallback);
             var model = _model;
+            return holder;
 
         }
-        
+
+        private void DetourInitCharacter(Human* self)
+        {
+            
+            _initializerHook!.Original(self);
+            
+        }
+        */
         
     }
     
 }
-
-/*
-    public async Task UpdateObjectbyIndex(uint index)
-    {
-        foreach (var item in Service.ObjectTable) //Game objects
-        {
-            if (item.IsValid() && (item.ObjectKind == ObjectKind.Player || item.ObjectKind == ObjectKind.BattleNpc || item.ObjectKind == ObjectKind.EventNpc || item.ObjectKind == ObjectKind.Retainer)) {
-
-                var atrDict = new Dictionary<uint, String>();
-                var shpDict = new Dictionary<uint, ValueTuple<short, String>>();
-                var gameObj = (GameObject*)item.Address;
-                var draw = (Human*)gameObj->DrawObject;
-                if (draw->ModelsSpan == null) return;
-                var models = draw->ModelsSpan;
-
-                foreach (var model in models)  //collect attributes and keys to check for matches
-
-                {
-
-                    if (model == null) continue;
-                    //if (model.Value->ModelResourceHandle->Shapes[model.Value->EnabledShapeKeyIndexMask]) continue;
-                    if(model.Value->ModelResourceHandle->Attributes.Count != 0)
-                    {
-                        foreach (var atr in model.Value->ModelResourceHandle->Attributes)
-                        {
-                            if (atr.Item1.ToString().Contains("atrx_"))
-                            {
-                                atrDict.Add(model.Value->RefCount, atr.Item1.Value->ToString().Split('_')[1]);
-                            }
-                        }
-                    }
-                    if (model.Value->ModelResourceHandle->Shapes.Count != 0) {
-                            foreach (var shp in model.Value->ModelResourceHandle->Shapes)
-                            {
-                                if (shp.Item1.ToString().Contains("shpx_"))  //!Utils.Constants.VanillaShp.Any
-                                {
-                                    shpDict.Add(model.Value->RefCount,(shp.Item2, shp.Item1.Value->ToString().Split('_')[1]));
-                                }
-                            }
-                    }
-                }
-
-
-
-                 * todo: compare non-vanilla shapes to non-vanilla attributes
-                 * Gotta figure out what the most memory efficient way of storing the data is, tempted to reference original memory locations but... eh?
-                 * I should make this loop through clothing and accessories only, other models arent that useful, yet....
-                 * how am I gonna compare these strings?? I need to think of a way short of stripping atr off the front, I'm tempted to enforce atrx_ and shpx_ but then I could have avoided literally everything I just did lol
-
-                foreach(var shp in shpDict)
-                {
-                    foreach (var atr in atrDict)
-                    {
-                        if (shp.Key != atr.Key && atr.Value.Contains(shp.Value.Item2))
-                        {
-                            models[(int)shp.Key].Value->EnabledShapeKeyIndexMask = (uint)shp.Value.Item1;
-                        }
-                    }
-
-                }
-
-            }
-        }
-        /
-
-        return;
-    } */
-
-
-  
 

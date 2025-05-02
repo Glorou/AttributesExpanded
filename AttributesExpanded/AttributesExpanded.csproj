@@ -1,15 +1,14 @@
 ﻿<Project Sdk="Dalamud.NET.SDK/12.0.2">
   <PropertyGroup>
     <Version>0.0.0.1</Version>
-    <Description>Checks for custom Attributes and Shapekeys.</Description>
-    <PackageProjectUrl>https://github.com/goatcorp/SamplePlugin</PackageProjectUrl>
+    <Description>Checks for custom Shapekeys.</Description>
+    <PackageProjectUrl>https://github.com/Glorou/AttributesExpanded</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
-    <BaseOutputPath>C:\Users\Karou\AppData\Roaming\XIVLauncher\devPlugins\Attributes</BaseOutputPath>
   </PropertyGroup>
 
-    <PropertyGroup>
-        <OutputPath>C:\Users\Karou\AppData\Roaming\XIVLauncher\devPlugins\Attributes</OutputPath>
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+        <OutputPath>C:\Users\Karou\AppData\Roaming\XIVLauncher\devPlugins\$(MSBuildProjectName)</OutputPath>
     </PropertyGroup>
     
 </Project>

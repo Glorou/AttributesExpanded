@@ -1,0 +1,20 @@
+[{
+  "Author": "Karou",
+  "Name": "Attributes Expanded",
+  "InternalName": "AttributesExpanded",
+  "AssemblyVersion":"0.0.0.1",
+  "Punchline": "What it says on the tin",
+  "Description": "Custom attributes",
+  "ApplicableVersion": "any",
+  "RepoUrl": "https://github.com/Glorou/AttributesExpanded",
+  "Tags": [
+  ],
+  "DalamudApiLevel": 12,
+  "LoadPriority": 0,
+  "DownloadCount": 0,
+  "DownloadLinkInstall": "https://github.com/Glorou/AttributesExpanded/releases/download/V0.0.0.1/v0.0.0.1Alpha.zip",
+  "DownloadLinkTesting": "https://github.com/Glorou/AttributesExpanded/releases/download/V0.0.0.1/v0.0.0.1Alpha.zip",
+  "DownloadLinkUpdate": "https://github.com/Glorou/AttributesExpanded/releases/download/V0.0.0.1/v0.0.0.1Alpha.zip",
+  "_isDip17Plugin": false,
+  "_Dip17Channel": null
+}]
