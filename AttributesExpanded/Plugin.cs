@@ -31,25 +31,20 @@ namespace AttributesExpanded;
  */
 public unsafe class Plugin : IDalamudPlugin
 {
-
-    private const string CommandName = "/atrex";
-
-    public Configuration Configuration { get; init; }
-
-    public readonly WindowSystem WindowSystem = new("Attributes Expanded");
-    private uint nextUpdateIndex = 0;
+    
+    
+    
     public MySiggedHook _mySiggedHook;
 
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
 
         Service.PluginInterface = pluginInterface;
-        Service.configuration = Service.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         _ = pluginInterface.Create<Service>();
         Service.plugin = this;
 
-        Service.Log.Information($"===A cool log message from {Service.PluginInterface.Manifest.Name}===");
+        Service.Log.Information($"==={Service.PluginInterface.Manifest.Name} turning on ===");
 
         
         _mySiggedHook = new MySiggedHook();
@@ -59,20 +54,13 @@ public unsafe class Plugin : IDalamudPlugin
     public void Dispose()
     {
         _mySiggedHook.Dispose();
-        WindowSystem.RemoveAllWindows();
-        Service.Commands.RemoveHandler(CommandName);
     }
     
     
     
-    /*
-     *Consider execution flow:
-     * Top happens first but only if one exists, I dont think its possible to *not* have a top? 
-     * for now do all processing of the model data and checking if I need to swap there
-     * We hook in to the rest of the functions and check if we need to activate them at all, make a dict<String, bool>
-     * so I can do if(enableDict["foot"]){actually mutate here} I should also probably calculate the bitmask outside the hook and store it too 
-     * oh or just do dict<String, short> and if .Value > 0 means it hit 
-     */
+    /// <summary>
+    /// Main hook, Everything this plugin does is inside here
+    /// </summary>
     public unsafe class MySiggedHook : IDisposable
     {
 
@@ -84,10 +72,7 @@ public unsafe class Plugin : IDalamudPlugin
         
         private delegate void SetupHandModelAttributes(Human* self, byte* data);
         
-        //Development hooks
-        private delegate nint SetupFromResourceHandle(Model* _model, ModelResourceHandle* _resourceHandle, nint _renderModelCallback, nint _renderMaterialCallback);
-
-        private delegate void InitCharacter(Human* self);
+        
 
         [Signature("E8 ?? ?? ?? ?? 48 8B 87 ?? ?? ?? ?? 44 0F B6 7C 24", DetourName = nameof(DetourTopModelAttributes))]
         private Hook<SetupTopModelAttributes>? _topUpdateHook;
@@ -103,12 +88,6 @@ public unsafe class Plugin : IDalamudPlugin
         [Signature("40 53 56 41 56 48 83 EC ?? 48 8B 99 ?? ?? ?? ?? 48 8B F2", DetourName = nameof(DetourFootModelAttributes))]
         private Hook<SetupFootModelAttributes>? _footUpdateHook;
         
-        //Development hooks
-/*[Signature("E8 ?? ?? ?? ?? 84 C0 75 ?? 48 8B 07 48 8B CF FF 50 ?? 32 C0", DetourName = nameof(DetourFromResourceHandle))]
-        private Hook<SetupFromResourceHandle>? _unknUpdateHook;
-        
-        [Signature("E8 ?? ?? ?? ?? C7 86 ?? ?? ?? ?? ?? ?? ?? ?? 48 83 C4", DetourName = nameof(DetourInitCharacter))]
-        private Hook<InitCharacter>? _initializerHook;*/
 
         private Dictionary<String, short> tempTopShapes = new Dictionary<String, short>();
         private Dictionary<String, short> tempBottomShapes = new Dictionary<String, short>();
@@ -117,7 +96,7 @@ public unsafe class Plugin : IDalamudPlugin
 
         private bool hasUpdated = false;
         
-        
+        // Stores masks generated in CalculateBitmask
         private Dictionary<short, uint> mask = new Dictionary<short, uint>
         {
             {1,0},
@@ -130,13 +109,12 @@ public unsafe class Plugin : IDalamudPlugin
         public MySiggedHook()
         {
             Service.GameInteropProvider.InitializeFromAttributes(this);
-
-            // Nullable because this might not have been initialized from IFA above, e.g. the sig was invalid.
+            
             _topUpdateHook?.Enable();
             _legUpdateHook?.Enable();
             _handUpdateHook?.Enable();
             _footUpdateHook?.Enable();
-            //_unknUpdateHook?.Enable();
+
         }
 
         public void Dispose()
@@ -145,12 +123,14 @@ public unsafe class Plugin : IDalamudPlugin
             _legUpdateHook?.Dispose();
             _handUpdateHook?.Dispose();
             _footUpdateHook?.Dispose();
-            //_unknUpdateHook?.Disable();
         }
 
 
 
-        /// <summary> Function iterates through all checked objects and sets bitmask for matching instances </summary>
+        /// <summary>
+        /// Function iterates through all checked objects and sets bitmask for matching instances
+        /// </summary>
+        /// <param name="self"></param>
         private void CalculateBitmask(Human* self)
         {
             //check if we already did this, 
@@ -293,7 +273,10 @@ public unsafe class Plugin : IDalamudPlugin
             }
 
         
-
+        /// <summary>
+        /// Detours top model processing, checks if legs have been updated, and if they haven't it calls the leg detour
+        /// The game is not guaranteed to update both so we have to do it manually.
+        /// </summary>
         private void DetourTopModelAttributes(Human* self, byte* data)
         {
             Service.Log.Information("Top Detour ");
@@ -312,6 +295,10 @@ public unsafe class Plugin : IDalamudPlugin
             mask[1] = 0;
         }
 
+        /// <summary>
+        /// Detours leg model processing, checks if top has been updated, and if they haven't it calls the top detour
+        /// The game is not guaranteed to update both so we have to do it manually.
+        /// </summary>
         private void DetourLegModelAttributes(Human* self, byte* data)
         {
             Service.Log.Information("Leg Detour");
@@ -331,6 +318,9 @@ public unsafe class Plugin : IDalamudPlugin
             mask[3] = 0;
             hasUpdated = false;
         }
+        
+        /// <summary> Detours hands, these should always run when a Chest piece is updated and vice versa. </summary>
+
         private void DetourHandModelAttributes(Human* self, byte* data)
         {
             Service.Log.Information("Hand Detour");
@@ -343,6 +333,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
             mask[2] = 0;
         }
+        /// <summary> Detours feet, these should always run when a Leg piece is updated and vice versa. </summary>
         private void DetourFootModelAttributes(Human* self, byte* data)
         {
             Service.Log.Information("Foot Detour");
@@ -355,23 +346,6 @@ public unsafe class Plugin : IDalamudPlugin
             }
             mask[4] = 0;
         }
-        
- /*       private nint DetourFromResourceHandle(Model* _model, ModelResourceHandle* _resourceHandle, nint _renderModelCallback, nint _renderMaterialCallback)
-        {
-            Service.Log.Information("Resource Handle Detour ");
-            var holder = _unknUpdateHook!.Original(_model, _resourceHandle, _renderModelCallback, _renderMaterialCallback);
-            var model = _model;
-            return holder;
-
-        }
-
-        private void DetourInitCharacter(Human* self)
-        {
-            
-            _initializerHook!.Original(self);
-            
-        }
-        */
         
     }
     
