@@ -1,9 +1,9 @@
 {
     "Author": "Karou",
-    "Name": "AttributesExpanded",
-    "InternalName": "AttributesExpanded",
-    "AssemblyVersion": "0.0.0.2",
-    "Description": "Custom Shapekeys because I actually lied :3",
+    "Name": "SimplyShapes",
+    "InternalName": "SimplyShapes",
+    "AssemblyVersion": "0.0.0.3",
+    "Description": "Custom Shapekeys",
     "ApplicableVersion": "any",
     "Tags": [
     ],

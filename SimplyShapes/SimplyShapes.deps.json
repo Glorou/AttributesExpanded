@@ -6,7 +6,7 @@
   "compilationOptions": {},
   "targets": {
     ".NETCoreApp,Version=v9.0": {
-      "AttributesExpanded/0.0.0.1": {
+      "SimplyShapes/0.0.0.1": {
         "dependencies": {
           "DalamudPackager": "11.0.0",
           "DotNet.ReproducibleBuilds": "1.1.1",
@@ -14,7 +14,7 @@
           "InteropGenerator.Runtime": "1.0.0.0"
         },
         "runtime": {
-          "AttributesExpanded.dll": {}
+          "SimplyShapes.dll": {}
         }
       },
       "DalamudPackager/11.0.0": {},
@@ -82,7 +82,7 @@
     }
   },
   "libraries": {
-    "AttributesExpanded/0.0.0.1": {
+    "SimplyShapes/0.0.0.1": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

@@ -1,32 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Dalamud.Game.Command;
 using Dalamud.Hooking;
-using Dalamud.Interface.Windowing;
-using Dalamud.Memory;
 using Dalamud.Plugin;
-using Dalamud.Plugin.Services;
 using Dalamud.Utility.Signatures;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
-using FFXIVClientStructs.FFXIV.Client.System.Resource.Handle;
-using FFXIVClientStructs.FFXIV.Client.UI.Misc;
-using FFXIVClientStructs.Interop;
-using FFXIVClientStructs.STD;
-using InteropGenerator.Runtime;
-using ObjectKind = Dalamud.Game.ClientState.Objects.Enums.ObjectKind;
 
-namespace AttributesExpanded;
-
+namespace SimplyShapes;
 
 public unsafe class Plugin : IDalamudPlugin
 {
-    
-    
     
     public MySiggedHook _mySiggedHook;
 

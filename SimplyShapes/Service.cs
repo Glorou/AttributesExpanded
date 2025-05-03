@@ -4,7 +4,7 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 
 
-namespace AttributesExpanded
+namespace SimplyShapes
 {
     internal class Service
     {
