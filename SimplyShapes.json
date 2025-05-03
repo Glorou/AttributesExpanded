@@ -4,7 +4,7 @@
   "InternalName": "SimplyShapes",
   "AssemblyVersion":"0.0.0.3",
   "Punchline": "What it says on the tin",
-  "Description": "Custom Shapekeys because I actually lied :3",
+  "Description": "Custom Shapekeys, thats all.",
   "ApplicableVersion": "any",
   "RepoUrl": "https://github.com/Glorou/SimplyShapes",
   "Tags": [
@@ -12,9 +12,9 @@
   "DalamudApiLevel": 12,
   "LoadPriority": 0,
   "DownloadCount": 0,
-  "DownloadLinkInstall": "https://github.com/Glorou/AttributesExpanded/releases/download/v0.0.0.2/v.0.0.0.2.zip",
-  "DownloadLinkTesting": "https://github.com/Glorou/AttributesExpanded/releases/download/v0.0.0.2/v.0.0.0.2.zip",
-  "DownloadLinkUpdate": "https://github.com/Glorou/AttributesExpanded/releases/download/v0.0.0.2/v.0.0.0.2.zip", 
+  "DownloadLinkInstall": "https://github.com/Glorou/SimplyShapes/releases/download/v0.0.0.3/v0.0.0.3.zip",
+  "DownloadLinkTesting": "https://github.com/Glorou/SimplyShapes/releases/download/v0.0.0.3/v0.0.0.3.zip",
+  "DownloadLinkUpdate": "https://github.com/Glorou/SimplyShapes/releases/download/v0.0.0.3/v0.0.0.3.zip", 
   "IconUrl": "https://raw.githubusercontent.com/Glorou/SimplyShapes/master/icon.png",
   "_isDip17Plugin": false,
   "_Dip17Channel": null
