@@ -1,35 +1,39 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
 using Dalamud.Utility.Signatures;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using Penumbra.Interop.PathResolving;
 
 namespace SimplyShapes;
 
 public unsafe class Plugin : IDalamudPlugin
 {
     
-    public MySiggedHook _mySiggedHook;
+    public ShapekeyHookset _shapekeyHookset;
 
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
         Service.PluginInterface = pluginInterface;
         _ = pluginInterface.Create<Service>();
         Service.plugin = this;
+        Service.CollectionResolver = new CollectionResolver();  //This is empty on purpose
         Service.Log.Information($"==={Service.PluginInterface.Manifest.Name} turning on ===");
-        _mySiggedHook = new MySiggedHook();
+        _shapekeyHookset = new ShapekeyHookset();
     }
     
     public void Dispose()
     {
-        _mySiggedHook.Dispose();
+        _shapekeyHookset.Dispose();
     }
     
     /// <summary>
     /// Main hook, Everything this plugin does is inside here
     /// </summary>
-    public unsafe class MySiggedHook : IDisposable
+    public unsafe class ShapekeyHookset : IDisposable
     {
         private delegate void SetupTopModelAttributes(Human* self, byte* data);
         private delegate void SetupLegModelAttributes(Human* self, byte* data);
@@ -58,7 +62,7 @@ public unsafe class Plugin : IDalamudPlugin
         private Dictionary<String, short> tempHandShapes = new Dictionary<String, short>();
         private Dictionary<String, short> tempFootShapes = new Dictionary<String, short>();
         
-        public MySiggedHook()
+        public ShapekeyHookset()
         {
             Service.GameInteropProvider.InitializeFromAttributes(this);
             
@@ -76,15 +80,50 @@ public unsafe class Plugin : IDalamudPlugin
             _handUpdateHook?.Dispose();
             _footUpdateHook?.Dispose();
         }
+        /// <summary>
+        /// Check if the Human* draw object is in a collection
+        /// </summary>
+        /// <param name="self"></param>
+        /// <returns></returns>
+
+        public bool CheckHumanCollection(Human* self)
+        {
+            return Service.CollectionResolver.IdentifyCollection((DrawObject*)self, true).Valid; //Not entirely sure if this would be cached here
+        }
+
         
         /// <summary>
-        /// Function iterates through all checked objects and sets bitmask for matching instances
+        /// Check if the model is modded by checking the path to the file, modded should return true
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        public bool IsModelRooted(Model* model)
+        {
+            return Path.IsPathRooted(model->ModelResourceHandle->FileName.ToString());
+        }
+        
+        /// <summary>
+        /// Function checks if a collection even applies to the Human*, if there is one, then checks if any seams have modded items
+        /// then iterates through all checked objects and sets bitmask for matching instances if a seam check passes
         /// </summary>
         /// <param name="self"></param>
         private void CalculateBitmask(Human* self)
         {
+            if (!CheckHumanCollection(self))
+            {
+                return;
+            }
+
+            bool enableWaist = IsModelRooted(self->ModelsSpan[1]) && IsModelRooted(self->ModelsSpan[3]);
+            bool enableWrist = IsModelRooted(self->ModelsSpan[1]) && IsModelRooted(self->ModelsSpan[2]);
+            bool enableAnkle = IsModelRooted(self->ModelsSpan[3]) && IsModelRooted(self->ModelsSpan[4]);
+            
+            if (!(enableWaist || enableWrist || enableAnkle))
+            {
+                return;
+            }
             //Top
-            if (self->ModelsSpan[1] != null)
+            if (self->ModelsSpan[1] != null && (enableWaist || enableWrist))
             {
                 foreach (var shape in self->ModelsSpan[1].Value->ModelResourceHandle->Shapes)
                 {
@@ -96,7 +135,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
             
             //Hands
-            if (self->ModelsSpan[2] != null)
+            if (self->ModelsSpan[2] != null && enableWrist)
             {
 
                 foreach (var shape in self->ModelsSpan[2].Value->ModelResourceHandle->Shapes)
@@ -110,7 +149,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
 
             //Legs
-            if (self->ModelsSpan[3] != null)
+            if (self->ModelsSpan[3] != null && (enableWaist || enableAnkle))
             {
                 foreach (var shape in self->ModelsSpan[3].Value->ModelResourceHandle->Shapes)
                 {
@@ -122,7 +161,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
             
             //Foot
-            if (self->ModelsSpan[4] != null)
+            if (self->ModelsSpan[4] != null && enableWrist)
             {
                 foreach (var shape in self->ModelsSpan[4].Value->ModelResourceHandle->Shapes)
                 {
