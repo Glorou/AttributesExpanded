@@ -10,9 +10,5 @@
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
         <OutputPath>C:\Users\Karou\AppData\Roaming\XIVLauncher\devPlugins\$(MSBuildProjectName)</OutputPath>
     </PropertyGroup>
-
-    <ItemGroup>
-      <ProjectReference Include="..\..\Penumbra\Penumbra\Penumbra.csproj" />
-    </ItemGroup>
     
 </Project>

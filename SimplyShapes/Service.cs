@@ -12,9 +12,6 @@ namespace SimplyShapes
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         [PluginService] internal static IGameInteropProvider GameInteropProvider { get; set; } = null!;
         internal static Plugin plugin { get; set; } = null!;
-        
-        [PluginService] internal static Penumbra.Interop.PathResolving.CollectionResolver CollectionResolver { get; set; } = null!;
-        
 
     }
 }

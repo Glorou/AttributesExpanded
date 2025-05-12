@@ -6,7 +6,7 @@ using Dalamud.Plugin;
 using Dalamud.Utility.Signatures;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
-using Penumbra.Interop.PathResolving;
+
 
 namespace SimplyShapes;
 
@@ -205,7 +205,7 @@ public unsafe class Plugin : IDalamudPlugin
         /// </summary>
         private void DetourTopModelAttributes(Human* self, byte* data)
         {
-            Service.Log.Information("Top Detour ");
+            Service.Log.Information("Top Detour");
             _topUpdateHook!.Original(self, data);
             CalculateBitmask(self);
         }
