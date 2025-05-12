@@ -20,7 +20,6 @@ public unsafe class Plugin : IDalamudPlugin
         Service.PluginInterface = pluginInterface;
         _ = pluginInterface.Create<Service>();
         Service.plugin = this;
-        Service.CollectionResolver = new CollectionResolver();  //This is empty on purpose
         Service.Log.Information($"==={Service.PluginInterface.Manifest.Name} turning on ===");
         _shapekeyHookset = new ShapekeyHookset();
     }
@@ -80,16 +79,6 @@ public unsafe class Plugin : IDalamudPlugin
             _handUpdateHook?.Dispose();
             _footUpdateHook?.Dispose();
         }
-        /// <summary>
-        /// Check if the Human* draw object is in a collection
-        /// </summary>
-        /// <param name="self"></param>
-        /// <returns></returns>
-
-        public bool CheckHumanCollection(Human* self)
-        {
-            return Service.CollectionResolver.IdentifyCollection((DrawObject*)self, true).Valid; //Not entirely sure if this would be cached here
-        }
 
         
         /// <summary>
@@ -97,10 +86,8 @@ public unsafe class Plugin : IDalamudPlugin
         /// </summary>
         /// <param name="model"></param>
         /// <returns></returns>
-        public bool IsModelRooted(Model* model)
-        {
-            return Path.IsPathRooted(model->ModelResourceHandle->FileName.ToString());
-        }
+        public bool IsModelNullOrGameTex(Model* model)
+            => model != null && Path.IsPathRooted(model->ModelResourceHandle->FileName.ToString());
         
         /// <summary>
         /// Function checks if a collection even applies to the Human*, if there is one, then checks if any seams have modded items
@@ -109,21 +96,17 @@ public unsafe class Plugin : IDalamudPlugin
         /// <param name="self"></param>
         private void CalculateBitmask(Human* self)
         {
-            if (!CheckHumanCollection(self))
-            {
-                return;
-            }
 
-            bool enableWaist = IsModelRooted(self->ModelsSpan[1]) && IsModelRooted(self->ModelsSpan[3]);
-            bool enableWrist = IsModelRooted(self->ModelsSpan[1]) && IsModelRooted(self->ModelsSpan[2]);
-            bool enableAnkle = IsModelRooted(self->ModelsSpan[3]) && IsModelRooted(self->ModelsSpan[4]);
+            bool enableWaist = IsModelNullOrGameTex(self->ModelsSpan[1]) && IsModelNullOrGameTex(self->ModelsSpan[3]);
+            bool enableWrist = IsModelNullOrGameTex(self->ModelsSpan[1]) && IsModelNullOrGameTex(self->ModelsSpan[2]);
+            bool enableAnkle = IsModelNullOrGameTex(self->ModelsSpan[3]) && IsModelNullOrGameTex(self->ModelsSpan[4]);
             
             if (!(enableWaist || enableWrist || enableAnkle))
             {
                 return;
             }
             //Top
-            if (self->ModelsSpan[1] != null && (enableWaist || enableWrist))
+            if(enableWaist || enableWrist)
             {
                 foreach (var shape in self->ModelsSpan[1].Value->ModelResourceHandle->Shapes)
                 {
@@ -135,7 +118,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
             
             //Hands
-            if (self->ModelsSpan[2] != null && enableWrist)
+            if (enableWrist)
             {
 
                 foreach (var shape in self->ModelsSpan[2].Value->ModelResourceHandle->Shapes)
@@ -149,7 +132,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
 
             //Legs
-            if (self->ModelsSpan[3] != null && (enableWaist || enableAnkle))
+            if (enableWaist || enableAnkle)
             {
                 foreach (var shape in self->ModelsSpan[3].Value->ModelResourceHandle->Shapes)
                 {
@@ -161,7 +144,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
             
             //Foot
-            if (self->ModelsSpan[4] != null && enableWrist)
+            if (enableWrist)
             {
                 foreach (var shape in self->ModelsSpan[4].Value->ModelResourceHandle->Shapes)
                 {
