@@ -1,16 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using Dalamud.Hooking;
 using Dalamud.Plugin;
 using Dalamud.Utility.Signatures;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+
 
 namespace SimplyShapes;
 
 public unsafe class Plugin : IDalamudPlugin
 {
     
-    public MySiggedHook _mySiggedHook;
+    public ShapekeyHookset _shapekeyHookset;
 
     public Plugin(IDalamudPluginInterface pluginInterface)
     {
@@ -18,18 +21,18 @@ public unsafe class Plugin : IDalamudPlugin
         _ = pluginInterface.Create<Service>();
         Service.plugin = this;
         Service.Log.Information($"==={Service.PluginInterface.Manifest.Name} turning on ===");
-        _mySiggedHook = new MySiggedHook();
+        _shapekeyHookset = new ShapekeyHookset();
     }
     
     public void Dispose()
     {
-        _mySiggedHook.Dispose();
+        _shapekeyHookset.Dispose();
     }
     
     /// <summary>
     /// Main hook, Everything this plugin does is inside here
     /// </summary>
-    public unsafe class MySiggedHook : IDisposable
+    public unsafe class ShapekeyHookset : IDisposable
     {
         private delegate void SetupTopModelAttributes(Human* self, byte* data);
         private delegate void SetupLegModelAttributes(Human* self, byte* data);
@@ -58,7 +61,7 @@ public unsafe class Plugin : IDalamudPlugin
         private Dictionary<String, short> tempHandShapes = new Dictionary<String, short>();
         private Dictionary<String, short> tempFootShapes = new Dictionary<String, short>();
         
-        public MySiggedHook()
+        public ShapekeyHookset()
         {
             Service.GameInteropProvider.InitializeFromAttributes(this);
             
@@ -76,15 +79,34 @@ public unsafe class Plugin : IDalamudPlugin
             _handUpdateHook?.Dispose();
             _footUpdateHook?.Dispose();
         }
+
         
         /// <summary>
-        /// Function iterates through all checked objects and sets bitmask for matching instances
+        /// Check if the model is modded by checking the path to the file, modded should return true
+        /// </summary>
+        /// <param name="model"></param>
+        /// <returns></returns>
+        public bool IsModelNullOrGameTex(Model* model)
+            => model != null && Path.IsPathRooted(model->ModelResourceHandle->FileName.ToString());
+        
+        /// <summary>
+        /// Function checks if a collection even applies to the Human*, if there is one, then checks if any seams have modded items
+        /// then iterates through all checked objects and sets bitmask for matching instances if a seam check passes
         /// </summary>
         /// <param name="self"></param>
         private void CalculateBitmask(Human* self)
         {
+
+            bool enableWaist = IsModelNullOrGameTex(self->ModelsSpan[1]) && IsModelNullOrGameTex(self->ModelsSpan[3]);
+            bool enableWrist = IsModelNullOrGameTex(self->ModelsSpan[1]) && IsModelNullOrGameTex(self->ModelsSpan[2]);
+            bool enableAnkle = IsModelNullOrGameTex(self->ModelsSpan[3]) && IsModelNullOrGameTex(self->ModelsSpan[4]);
+            
+            if (!(enableWaist || enableWrist || enableAnkle))
+            {
+                return;
+            }
             //Top
-            if (self->ModelsSpan[1] != null)
+            if(enableWaist || enableWrist)
             {
                 foreach (var shape in self->ModelsSpan[1].Value->ModelResourceHandle->Shapes)
                 {
@@ -96,7 +118,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
             
             //Hands
-            if (self->ModelsSpan[2] != null)
+            if (enableWrist)
             {
 
                 foreach (var shape in self->ModelsSpan[2].Value->ModelResourceHandle->Shapes)
@@ -110,7 +132,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
 
             //Legs
-            if (self->ModelsSpan[3] != null)
+            if (enableWaist || enableAnkle)
             {
                 foreach (var shape in self->ModelsSpan[3].Value->ModelResourceHandle->Shapes)
                 {
@@ -122,7 +144,7 @@ public unsafe class Plugin : IDalamudPlugin
             }
             
             //Foot
-            if (self->ModelsSpan[4] != null)
+            if (enableWrist)
             {
                 foreach (var shape in self->ModelsSpan[4].Value->ModelResourceHandle->Shapes)
                 {
@@ -183,7 +205,7 @@ public unsafe class Plugin : IDalamudPlugin
         /// </summary>
         private void DetourTopModelAttributes(Human* self, byte* data)
         {
-            Service.Log.Information("Top Detour ");
+            Service.Log.Information("Top Detour");
             _topUpdateHook!.Original(self, data);
             CalculateBitmask(self);
         }
